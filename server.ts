@@ -201,11 +201,11 @@ async function startServer() {
       } catch (e) {}
 
       console.log(`Installing dependencies...`);
-      await runCommand("npm", ["install", "--legacy-peer-deps", "--no-audit", "--no-fund", "--loglevel=error"], buildDir);
+      await runCommand("npm", ["install", "--legacy-peer-deps", "--no-audit", "--no-fund", "--include=dev", "--loglevel=error"], buildDir);
 
       console.log(`Ensuring missing dependencies are installed (react-is)...`);
       try {
-          await runCommand("npm", ["install", "react-is", "--legacy-peer-deps", "--no-audit", "--no-fund", "--loglevel=error"], buildDir);
+          await runCommand("npm", ["install", "react-is", "--legacy-peer-deps", "--include=dev", "--no-audit", "--no-fund", "--loglevel=error"], buildDir);
       } catch(e) {
           console.warn("Failed to install react-is, continuing...");
       }
