@@ -23,7 +23,7 @@ function runCommand(command: string, args: string[], cwd: string): Promise<void>
     console.log(`Running: ${command} ${args.join(' ')} in ${cwd}`);
     const isWin = process.platform === 'win32';
     const cmd = isWin ? `${command}.cmd` : command;
-    const proc = spawn(cmd, args, { cwd, env: { ...process.env, NODE_OPTIONS: '--max-old-space-size=384' } });
+    const proc = spawn(cmd, args, { cwd, env: { ...process.env, NODE_ENV: 'development', NODE_OPTIONS: '--max-old-space-size=512' } });
     
     let errOutput = "";
     proc.stdout.on('data', (data) => {
