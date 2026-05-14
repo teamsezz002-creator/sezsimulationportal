@@ -21,23 +21,31 @@ const buildJobs = new Map<string, { status: 'building' | 'completed' | 'error', 
 function runCommand(command: string, args: string[], cwd: string): Promise<void> {
   return new Promise((resolve, reject) => {
     console.log(`Running: ${command} ${args.join(' ')} in ${cwd}`);
-    const proc = spawn(command, args, { cwd, shell: true, env: { ...process.env, NODE_OPTIONS: '--max-old-space-size=1024' } });
+    const isWin = process.platform === 'win32';
+    const cmd = isWin ? `${command}.cmd` : command;
+    const proc = spawn(cmd, args, { cwd, env: { ...process.env, NODE_OPTIONS: '--max-old-space-size=384' } });
     
-    proc.stdout.on('data', (data) => console.log(`[${command}] ${data.toString().trim()}`));
+    let errOutput = "";
+    proc.stdout.on('data', (data) => {
+        const text = data.toString();
+        errOutput += text;
+        console.log(`[${command}] ${text.trim()}`);
+    });
     proc.stderr.on('data', (data) => {
-        const text = data.toString().trim();
-        if (text) {
+        const text = data.toString();
+        if (text.trim()) {
+           errOutput += text;
            if (text.toLowerCase().includes('warn') || text.toLowerCase().includes('deprecated')) {
-               console.log(`[${command} WARN] ${text}`);
+               console.log(`[${command} WARN] ${text.trim()}`);
            } else {
-               console.error(`[${command} ERR] ${text}`);
+               console.error(`[${command} ERR] ${text.trim()}`);
            }
         }
     });
     
     proc.on('close', (code) => {
       if (code === 0) resolve();
-      else reject(new Error(`Command ${command} exited with code ${code}`));
+      else reject(new Error(`Command ${command} exited with code ${code}.\nLogs: ${errOutput.substring(errOutput.length - 2000)}`));
     });
   });
 }
@@ -187,7 +195,12 @@ async function startServer() {
         throw new Error("Could not find package.json in the uploaded ZIP.");
       }
 
-      console.log(`Found package.json in ${buildDir}. Installing dependencies...`);
+      console.log(`Found package.json in ${buildDir}. Cleaning up lockfiles...`);
+      try {
+          fs.rmSync(path.join(buildDir, 'node_modules'), { recursive: true, force: true });
+      } catch (e) {}
+
+      console.log(`Installing dependencies...`);
       await runCommand("npm", ["install", "--legacy-peer-deps", "--no-audit", "--no-fund", "--loglevel=error"], buildDir);
 
       console.log(`Ensuring missing dependencies are installed (react-is)...`);
@@ -297,7 +310,7 @@ async function startServer() {
   app.get("/api/build-status/:jobId", (req, res) => {
     const job = buildJobs.get(req.params.jobId);
     if (!job) {
-      return res.status(404).json({ error: "Job not found" });
+      return res.json({ status: "error", message: "Job not found on the build server. The server may have restarted due to out-of-memory." });
     }
     res.json(job);
   });
